@@ -1,270 +1,324 @@
 import socket
 import threading
+
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.core.window import Window
-from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
-from kivy.uix.popup import Popup
-
+from kivy.uix.scrollview import ScrollView
 
 PORT = 5000
-BUFFER = 4096
 
 
 class ChatApp(App):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.client = None
+        self.connected = False
+        self.buffer = b""
+
     def build(self):
         self.title = "Edy P2P Chat"
-        self.sock = None
-        self.conn = None
-        self.running = False
-        self.role = None
 
-        try:
-            Window.size = (430, 760)
-        except Exception:
-            pass
-
-        root = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(8))
-
-        title = Label(
-            text="[b]EDY P2P CHAT[/b]",
-            markup=True,
-            size_hint_y=None,
-            height=dp(48),
-            font_size="22sp",
+        root = BoxLayout(
+            orientation="vertical",
+            padding=10,
+            spacing=8
         )
-        root.add_widget(title)
 
+        # IP
+        ip_row = BoxLayout(
+            size_hint_y=None,
+            height=50,
+            spacing=5
+        )
+
+        self.ip_input = TextInput(
+            hint_text="Server IP",
+            multiline=False
+        )
+
+        self.connect_button = Button(
+            text="Connect",
+            size_hint_x=None,
+            width=110
+        )
+
+        self.connect_button.bind(
+            on_press=self.connect_button_pressed
+        )
+
+        ip_row.add_widget(self.ip_input)
+        ip_row.add_widget(self.connect_button)
+
+        root.add_widget(ip_row)
+
+        # Status
         self.status = Label(
             text="Disconnected",
             size_hint_y=None,
-            height=dp(32),
+            height=35
         )
+
         root.add_widget(self.status)
 
-        top = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
-        self.ip_input = TextInput(
-            hint_text="Server IP / Tailscale IP",
-            multiline=False,
-        )
-        top.add_widget(self.ip_input)
+        # Messages
+        scroll = ScrollView()
 
-        connect_btn = Button(text="Connect")
-        connect_btn.bind(on_release=self.connect_client)
-        top.add_widget(connect_btn)
-        root.add_widget(top)
-
-        buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
-
-        server_btn = Button(text="Start Server")
-        server_btn.bind(on_release=self.start_server)
-        buttons.add_widget(server_btn)
-
-        disconnect_btn = Button(text="Disconnect")
-        disconnect_btn.bind(on_release=self.disconnect)
-        buttons.add_widget(disconnect_btn)
-
-        root.add_widget(buttons)
-
-        self.scroll = ScrollView()
         self.messages = Label(
             text="",
-            markup=True,
-            halign="left",
-            valign="top",
             size_hint_y=None,
-            text_size=(None, None),
+            halign="left",
+            valign="top"
         )
+
         self.messages.bind(
-            texture_size=lambda instance, value: setattr(
-                instance, "height", max(dp(10), value[1])
-            )
+            texture_size=self.update_message_height
         )
-        self.scroll.add_widget(self.messages)
-        root.add_widget(self.scroll)
 
-        bottom = BoxLayout(size_hint_y=None, height=dp(54), spacing=dp(6))
+        scroll.add_widget(self.messages)
+
+        root.add_widget(scroll)
+
+        # Message input
+        message_row = BoxLayout(
+            size_hint_y=None,
+            height=55,
+            spacing=5
+        )
+
         self.message_input = TextInput(
-            hint_text="Write a message...",
-            multiline=False,
+            hint_text="Message...",
+            multiline=False
         )
-        self.message_input.bind(on_text_validate=self.send_message)
-        bottom.add_widget(self.message_input)
 
-        send_btn = Button(text="Send", size_hint_x=None, width=dp(90))
-        send_btn.bind(on_release=self.send_message)
-        bottom.add_widget(send_btn)
+        send_button = Button(
+            text="Send",
+            size_hint_x=None,
+            width=90
+        )
 
-        root.add_widget(bottom)
+        send_button.bind(
+            on_press=self.send_message
+        )
+
+        self.message_input.bind(
+            on_text_validate=self.send_message
+        )
+
+        message_row.add_widget(self.message_input)
+        message_row.add_widget(send_button)
+
+        root.add_widget(message_row)
 
         return root
 
-    def set_status(self, text):
-        Clock.schedule_once(lambda dt: setattr(self.status, "text", text))
+    def update_message_height(self, *_):
+        self.messages.height = max(
+            self.messages.texture_size[1],
+            100
+        )
 
-    def add_message(self, who, message):
-        def update(dt):
-            prefix = "[b]You:[/b]" if who == "You" else "[b]Other:[/b]"
-            self.messages.text += f"{prefix} {message}\n"
-            self.messages.texture_update()
-            Clock.schedule_once(
-                lambda _: setattr(self.scroll, "scroll_y", 0), 0
-            )
+    def add_message(self, message):
+        def update(_):
+            if self.messages.text:
+                self.messages.text += "\n"
+
+            self.messages.text += message
+
         Clock.schedule_once(update)
 
-    def start_server(self, *_):
-        if self.running:
-            self.set_status("Already running")
+    def set_status(self, text):
+        Clock.schedule_once(
+            lambda _: setattr(self.status, "text", text)
+        )
+
+    def connect_button_pressed(self, *_):
+
+        if self.connected:
+            self.disconnect()
             return
 
-        try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.bind(("0.0.0.0", PORT))
-            self.sock.listen(1)
-
-            self.running = True
-            self.role = "server"
-            self.set_status(f"Waiting on port {PORT}...")
-
-            threading.Thread(target=self.accept_connection, daemon=True).start()
-        except Exception as e:
-            self.cleanup_socket()
-            self.show_error(str(e))
-
-    def accept_connection(self):
-        try:
-            conn, address = self.sock.accept()
-            self.conn = conn
-            self.set_status(f"Connected: {address[0]}:{address[1]}")
-            self.add_message("Other", "Connected.")
-            threading.Thread(target=self.receive_loop, daemon=True).start()
-        except Exception as e:
-            if self.running:
-                self.set_status("Server error")
-                self.show_error(str(e))
-
-    def connect_client(self, *_):
         ip = self.ip_input.text.strip()
 
         if not ip:
-            self.show_error("Enter the server IP first.")
+            self.set_status("Enter server IP")
             return
 
-        if self.running:
-            self.set_status("Already connected/running")
-            return
+        self.connect_button.disabled = True
+        self.set_status("Connecting...")
 
         threading.Thread(
-            target=self.client_connect_thread,
+            target=self.connect_worker,
             args=(ip,),
-            daemon=True,
+            daemon=True
         ).start()
 
-    def client_connect_thread(self, ip):
+    def connect_worker(self, ip):
+
         try:
-            self.set_status("Connecting...")
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(12)
-            s.connect((ip, PORT))
-            s.settimeout(None)
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
 
-            self.conn = s
-            self.running = True
-            self.role = "client"
+            sock.settimeout(10)
 
-            self.set_status("Connected")
-            self.add_message("Other", "Connected.")
-            threading.Thread(target=self.receive_loop, daemon=True).start()
+            sock.connect(
+                (ip, PORT)
+            )
+
+            sock.settimeout(None)
+
+            self.client = sock
+            self.connected = True
+            self.buffer = b""
+
+            self.set_status(
+                f"Connected: {ip}:{PORT}"
+            )
+
+            Clock.schedule_once(
+                self.connection_ui
+            )
+
+            threading.Thread(
+                target=self.receive_messages,
+                daemon=True
+            ).start()
+
         except Exception as e:
-            self.running = False
-            self.show_error(str(e))
-            self.set_status("Connection failed")
 
-    def receive_loop(self):
-        buffer = b""
+            self.client = None
+            self.connected = False
 
-        while self.running and self.conn:
+            self.set_status(
+                f"Connection failed: {e}"
+            )
+
+            Clock.schedule_once(
+                self.connection_ui
+            )
+
+    def connection_ui(self, *_):
+
+        self.connect_button.disabled = False
+
+        if self.connected:
+            self.connect_button.text = "Disconnect"
+        else:
+            self.connect_button.text = "Connect"
+
+    def receive_messages(self):
+
+        while self.connected and self.client:
+
             try:
-                data = self.conn.recv(BUFFER)
+
+                data = self.client.recv(4096)
+
                 if not data:
                     break
 
-                buffer += data
+                self.buffer += data
 
-                while b"\n" in buffer:
-                    raw, buffer = buffer.split(b"\n", 1)
+                while b"\n" in self.buffer:
+
+                    raw, self.buffer = self.buffer.split(
+                        b"\n",
+                        1
+                    )
+
                     if raw:
-                        self.add_message("Other", raw.decode("utf-8", errors="replace"))
 
-            except (ConnectionResetError, BrokenPipeError, OSError):
+                        message = raw.decode(
+                            "utf-8",
+                            errors="replace"
+                        )
+
+                        self.add_message(
+                            "Other: " + message
+                        )
+
+            except (
+                ConnectionResetError,
+                BrokenPipeError,
+                OSError
+            ):
+
                 break
 
-        if self.running:
-            self.set_status("Disconnected")
-        self.running = False
+        self.connected = False
+        self.client = None
+
+        self.set_status("Connection lost")
+
+        Clock.schedule_once(
+            self.connection_ui
+        )
 
     def send_message(self, *_):
+
+        if not self.connected or not self.client:
+            self.set_status("Not connected")
+            return
+
         message = self.message_input.text.strip()
+
         if not message:
             return
 
-        if not self.conn or not self.running:
-            self.show_error("Connect to someone first.")
+        if message.lower() == "/exit":
+            self.disconnect()
             return
 
         try:
-            self.conn.sendall((message + "\n").encode("utf-8"))
-            self.add_message("You", message)
+
+            self.client.sendall(
+                (message + "\n").encode("utf-8")
+            )
+
+            self.add_message(
+                "You: " + message
+            )
+
             self.message_input.text = ""
-        except (BrokenPipeError, ConnectionResetError, OSError):
-            self.set_status("Connection lost")
+
+        except (
+            ConnectionResetError,
+            BrokenPipeError,
+            OSError
+        ):
+
             self.disconnect()
 
-    def disconnect(self, *_):
-        self.running = False
-        try:
-            if self.conn:
-                self.conn.shutdown(socket.SHUT_RDWR)
-        except Exception:
-            pass
-        try:
-            if self.conn:
-                self.conn.close()
-        except Exception:
-            pass
-        self.conn = None
+    def disconnect(self):
 
-        try:
-            if self.sock:
-                self.sock.close()
-        except Exception:
-            pass
-        self.sock = None
+        self.connected = False
+
+        if self.client:
+
+            try:
+                self.client.shutdown(
+                    socket.SHUT_RDWR
+                )
+            except OSError:
+                pass
+
+            try:
+                self.client.close()
+            except OSError:
+                pass
+
+        self.client = None
 
         self.set_status("Disconnected")
 
-    def cleanup_socket(self):
-        try:
-            if self.sock:
-                self.sock.close()
-        except Exception:
-            pass
-        self.sock = None
-
-    def show_error(self, message):
-        def popup(dt):
-            Popup(
-                title="Edy P2P Chat",
-                content=Label(text=message),
-                size_hint=(0.85, 0.35),
-            ).open()
-        Clock.schedule_once(popup)
+        self.connect_button.text = "Connect"
+        self.connect_button.disabled = False
 
     def on_stop(self):
         self.disconnect()
