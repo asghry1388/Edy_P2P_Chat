@@ -32,10 +32,6 @@ android.accept_sdk_license = True
 
 android.debug_artifact = apk
 
-p4a.fork = kivy
-
-p4a.branch = develop
-
 [buildozer]
 
 log_level = 2
