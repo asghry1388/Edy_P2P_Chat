@@ -1,48 +1,50 @@
 [app]
 
-# (str) Title of your application
+# Application title
 title = Edy P2P Chat
 
-# (str) Package name
+# Package name
 package.name = edyp2pchat
 
-# (str) Package domain
+# Package domain
 package.domain = org.edy
 
-# (str) Source code where main.py lives
+# Source code
 source.dir = .
 
-# (str) Main Python file
+# Main Python file
 source.include_exts = py,png,jpg,kv,atlas,txt
 
-# (str) Application version
+# Application version
 version = 1.0
 
-# (str) Requirements
+# Requirements
 requirements = python3,kivy
 
-# (str) Supported orientation
+# Orientation
 orientation = portrait
 
-# (list) Android permissions
+# Android permissions
 android.permissions = INTERNET
 
-# (int) Target Android API
+# Android API
 android.api = 35
-
-# (int) Minimum Android API
 android.minapi = 23
 
-# (bool) Indicate if the application should be fullscreen
+# Fullscreen
 fullscreen = 0
 
-# (str) Supported architectures
-android.archs = arm64-v8a, armeabi-v7a
+# Architectures
+android.archs = arm64-v8a,armeabi-v7a
 
-# (bool) Warn about Python-for-Android bootstrapping
+# Accept Android SDK licenses automatically
+android.accept_sdk_license = True
+
+# Warn about running as root
 warn_on_root = 1
+
 
 [buildozer]
 
-# (int) Log level
+# Log level
 log_level = 2
