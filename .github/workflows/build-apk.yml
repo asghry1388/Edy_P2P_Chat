@@ -3,6 +3,9 @@ name: Build Android APK
 on:
   workflow_dispatch:
 
+env:
+  PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE: "0"
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -26,38 +29,33 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
             autoconf \
             automake \
             autopoint \
             gettext \
             libtool \
             libltdl-dev \
-            pkg-config \
             build-essential \
-            ccache \
+            pkg-config \
             cmake \
+            ccache \
             libffi-dev \
             libssl-dev \
             zlib1g-dev \
             libncurses5-dev \
-            libncursesw5-dev
+            libncursesw5-dev \
+            unzip \
+            zip
 
       - name: Install Buildozer
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install --upgrade buildozer cython
-
-      - name: Clean old Buildozer files
-        run: |
-          rm -rf .buildozer
-          rm -rf bin
+          python -m pip install --upgrade pip
+          pip install buildozer cython
 
       - name: Build APK
         run: |
+          rm -rf .buildozer
+          rm -rf bin
           buildozer android debug
 
       - name: Upload APK
