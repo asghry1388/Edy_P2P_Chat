@@ -22,7 +22,9 @@ android.permissions = INTERNET
 
 android.api = 35
 
-android.minapi = 23
+android.minapi = 24
+
+android.ndk_api = 24
 
 android.archs = arm64-v8a,armeabi-v7a
 
@@ -30,10 +32,9 @@ android.accept_sdk_license = True
 
 android.debug_artifact = apk
 
-# Use stable python-for-android release
 p4a.fork = kivy
-p4a.branch = master
-p4a.commit = 58d2114
+
+p4a.branch = develop
 
 [buildozer]
 
