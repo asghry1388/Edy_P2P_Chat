@@ -9,7 +9,7 @@ source.include_exts = py,png,jpg,jpeg,kv,atlas,txt,json
 
 version = 1.0
 
-requirements = python3==3.12.10,kivy
+requirements = python3==3.12.10,hostpython3==3.12.10,kivy
 
 orientation = portrait
 fullscreen = 0
@@ -24,7 +24,6 @@ android.archs = arm64-v8a
 android.accept_sdk_license = True
 
 android.debug_artifact = apk
-
 
 [buildozer]
 
