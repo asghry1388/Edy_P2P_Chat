@@ -1,65 +1,121 @@
-name: Build Android APK
+name: Build Edy P2P Chat APK
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE: "0"
 
 jobs:
-  build:
+  build-apk:
+    name: Build Android APK
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
 
+      # -----------------------------
+      # 1. Download project
+      # -----------------------------
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # -----------------------------
+      # 2. Python
+      # -----------------------------
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
+      # -----------------------------
+      # 3. Java 17
+      # -----------------------------
       - name: Setup Java
         uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Install dependencies
+      # -----------------------------
+      # 4. Linux dependencies
+      # -----------------------------
+      - name: Install Linux dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            git \
+            zip \
+            unzip \
             autoconf \
             automake \
             autopoint \
             gettext \
             libtool \
             libltdl-dev \
-            build-essential \
             pkg-config \
-            cmake \
-            ccache \
-            libffi-dev \
-            libssl-dev \
             zlib1g-dev \
             libncurses5-dev \
             libncursesw5-dev \
-            unzip \
-            zip
+            libtinfo6 \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            build-essential \
+            ccache \
+            python3-virtualenv
 
+      # -----------------------------
+      # 5. Install Buildozer
+      # -----------------------------
       - name: Install Buildozer
         run: |
-          python -m pip install --upgrade pip
-          pip install buildozer cython
+          python -m pip install --upgrade pip setuptools wheel
 
-      - name: Build APK
+          pip install --no-cache-dir buildozer
+
+      # -----------------------------
+      # 6. Show versions
+      # -----------------------------
+      - name: Show build versions
+        run: |
+          python --version
+          pip --version
+          buildozer --version
+          java -version
+
+      # -----------------------------
+      # 7. Clean old build files
+      # -----------------------------
+      - name: Clean Buildozer cache
         run: |
           rm -rf .buildozer
           rm -rf bin
+
+      # -----------------------------
+      # 8. Build APK
+      # -----------------------------
+      - name: Build APK
+        run: |
           buildozer android debug
 
+      # -----------------------------
+      # 9. Find APK
+      # -----------------------------
+      - name: Find APK
+        run: |
+          echo "APK files:"
+          find bin -type f -name "*.apk" -print
+
+      # -----------------------------
+      # 10. Upload APK
+      # -----------------------------
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Edy-P2P-Chat-APK
           path: bin/*.apk
+          if-no-files-found: error
