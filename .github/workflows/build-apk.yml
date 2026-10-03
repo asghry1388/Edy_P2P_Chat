@@ -16,21 +16,36 @@ jobs:
 
     steps:
 
+      # ==========================================
+      # 1. Checkout
+      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # ==========================================
+      # 2. Python
+      # ==========================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
+      # ==========================================
+      # 3. Java
+      # ==========================================
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Install dependencies
+
+      # ==========================================
+      # 4. Linux dependencies
+      # ==========================================
+      - name: Install Linux dependencies
         run: |
           sudo apt-get update
 
@@ -39,6 +54,7 @@ jobs:
             curl \
             zip \
             unzip \
+            wget \
             autoconf \
             automake \
             autopoint \
@@ -57,73 +73,235 @@ jobs:
             ccache \
             python3-virtualenv
 
+
+      # ==========================================
+      # 5. Install Buildozer
+      # ==========================================
       - name: Install Buildozer
         run: |
           python -m pip install --upgrade pip
-          python -m pip install buildozer cython
 
-      - name: Prepare Buildozer Android SDK
-        run: |
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          python -m pip install \
+            buildozer \
+            cython
 
-          mkdir -p "$SDK/cmdline-tools"
 
-          if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
-
-            curl -L \
-              "https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip" \
-              -o /tmp/android-tools.zip
-
-            rm -rf /tmp/android-cmdline-tools
-
-            mkdir -p /tmp/android-cmdline-tools
-
-            unzip -q \
-              /tmp/android-tools.zip \
-              -d /tmp/android-cmdline-tools
-
-            rm -rf "$SDK/cmdline-tools/latest"
-
-            mkdir -p "$SDK/cmdline-tools/latest"
-
-            cp -r \
-              /tmp/android-cmdline-tools/cmdline-tools/. \
-              "$SDK/cmdline-tools/latest/"
-          fi
-
-          SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
-
-          yes | "$SDKMANAGER" \
-            --sdk_root="$SDK" \
-            --licenses || true
-
-          "$SDKMANAGER" \
-            --sdk_root="$SDK" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-          echo "Checking AIDL..."
-
-          test -f \
-            "$SDK/build-tools/35.0.0/aidl"
-
-          echo "AIDL FOUND:"
-          "$SDK/build-tools/35.0.0/aidl" --version
-
+      # ==========================================
+      # 6. Clean previous Android build
+      # ==========================================
       - name: Clean Buildozer
         run: |
           rm -rf .buildozer
           rm -rf bin
 
+          echo "Buildozer cache cleaned."
+
+
+      # ==========================================
+      # 7. Prepare Android SDK
+      # ==========================================
+      - name: Prepare Android SDK
+        run: |
+
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "Android SDK:"
+          echo "$SDK"
+
+          mkdir -p "$SDK/cmdline-tools"
+
+
+          # ------------------------------------------
+          # Download Android command line tools
+          # ------------------------------------------
+
+          curl -L \
+            "https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip" \
+            -o /tmp/android-tools.zip
+
+
+          # ------------------------------------------
+          # Extract command line tools
+          # ------------------------------------------
+
+          rm -rf /tmp/android-cmdline-tools
+
+          mkdir -p /tmp/android-cmdline-tools
+
+          unzip -q \
+            /tmp/android-tools.zip \
+            -d /tmp/android-cmdline-tools
+
+
+          # ------------------------------------------
+          # Install command line tools
+          # ------------------------------------------
+
+          rm -rf "$SDK/cmdline-tools/latest"
+
+          mkdir -p "$SDK/cmdline-tools/latest"
+
+          cp -r \
+            /tmp/android-cmdline-tools/cmdline-tools/. \
+            "$SDK/cmdline-tools/latest/"
+
+
+          # ------------------------------------------
+          # sdkmanager
+          # ------------------------------------------
+
+          SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+
+          echo "SDKMANAGER:"
+          echo "$SDKMANAGER"
+
+          "$SDKMANAGER" \
+            --sdk_root="$SDK" \
+            --version
+
+
+          # ------------------------------------------
+          # Accept licenses
+          # ------------------------------------------
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$SDK" \
+            --licenses || true
+
+
+          # ------------------------------------------
+          # Install Android components
+          # ------------------------------------------
+
+          "$SDKMANAGER" \
+            --sdk_root="$SDK" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;34.0.0"
+
+
+          # ------------------------------------------
+          # Check installation
+          # ------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "Installed Android Build Tools"
+          echo "=========================================="
+
+          ls -la "$SDK/build-tools/"
+
+
+          # ------------------------------------------
+          # Check AIDL
+          # ------------------------------------------
+
+          echo ""
+          echo "=========================================="
+          echo "Checking AIDL"
+          echo "=========================================="
+
+          test -f \
+            "$SDK/build-tools/34.0.0/aidl"
+
+          chmod +x \
+            "$SDK/build-tools/34.0.0/aidl"
+
+          "$SDK/build-tools/34.0.0/aidl" --version
+
+          echo ""
+          echo "AIDL FOUND SUCCESSFULLY."
+
+
+      # ==========================================
+      # 8. Configure Android SDK environment
+      # ==========================================
+      - name: Configure Android SDK
+        run: |
+
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "ANDROIDSDK=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK/build-tools/34.0.0" >> "$GITHUB_PATH"
+
+          echo ""
+          echo "=========================================="
+          echo "Android environment"
+          echo "=========================================="
+
+          echo "ANDROIDSDK=$SDK"
+          echo "ANDROID_HOME=$SDK"
+          echo "ANDROID_SDK_ROOT=$SDK"
+
+
+      # ==========================================
+      # 9. Verify Android environment
+      # ==========================================
+      - name: Verify Android environment
+        run: |
+
+          echo "ANDROIDSDK=$ANDROIDSDK"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+          echo ""
+          echo "Java:"
+          java -version
+
+          echo ""
+          echo "Python:"
+          python --version
+
+          echo ""
+          echo "Buildozer:"
+          buildozer --version
+
+          echo ""
+          echo "ADB:"
+          adb version
+
+          echo ""
+          echo "AIDL:"
+          "$ANDROIDSDK/build-tools/34.0.0/aidl" --version
+
+
+      # ==========================================
+      # 10. Build APK
+      # ==========================================
       - name: Build APK
         run: |
+
+          echo "=========================================="
+          echo "Starting Buildozer Android build"
+          echo "=========================================="
+
           buildozer -v android debug
 
+
+      # ==========================================
+      # 11. Find APK
+      # ==========================================
       - name: Find APK
         run: |
-          find bin -type f -name "*.apk" -print
 
+          echo "=========================================="
+          echo "Generated APK files"
+          echo "=========================================="
+
+          find bin \
+            -type f \
+            -name "*.apk" \
+            -print
+
+
+      # ==========================================
+      # 12. Upload APK
+      # ==========================================
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
