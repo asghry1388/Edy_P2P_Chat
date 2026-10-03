@@ -1,50 +1,42 @@
 [app]
 
-# Application title
 title = Edy P2P Chat
 
-# Package name
 package.name = edyp2pchat
 
-# Package domain
 package.domain = org.edy
 
-# Source code
 source.dir = .
 
-# Main Python file
-source.include_exts = py,png,jpg,kv,atlas,txt
+source.include_exts = py,png,jpg,jpeg,kv,atlas,txt,json
 
-# Application version
 version = 1.0
 
-# Requirements
 requirements = python3,kivy
 
-# Orientation
 orientation = portrait
 
-# Android permissions
-android.permissions = INTERNET
-
-# Android API
-android.api = 35
-android.minapi = 23
-
-# Fullscreen
 fullscreen = 0
 
-# Architectures
+android.permissions = INTERNET
+
+android.api = 35
+
+android.minapi = 23
+
 android.archs = arm64-v8a,armeabi-v7a
 
-# Accept Android SDK licenses automatically
 android.accept_sdk_license = True
 
-# Warn about running as root
-warn_on_root = 1
+android.debug_artifact = apk
 
+# Use stable python-for-android release
+p4a.fork = kivy
+p4a.branch = master
+p4a.commit = 58d2114
 
 [buildozer]
 
-# Log level
 log_level = 2
+
+warn_on_root = 1
