@@ -9,14 +9,14 @@ source.include_exts = py,png,jpg,jpeg,kv,atlas,txt,json
 
 version = 1.0
 
-requirements = python3,kivy
+requirements = python3==3.12.10,kivy
 
 orientation = portrait
 fullscreen = 0
 
 android.permissions = INTERNET
 
-android.api = 36
+android.api = 35
 android.minapi = 24
 
 android.archs = arm64-v8a
